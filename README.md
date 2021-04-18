@@ -23,3 +23,4 @@ Bonus, compared to their phone app:
 8) FastLED can be used to sequence colors in a multi port setup!
 9) Connect to found XBT controllers, control their colors! Phone pairing requires placing phone on XBT directly, the ESP32 can connect to it in visible BLE range, no contact!
 10) MAC addresses of your XBT connections are stored on ESP32 SPIFFS, so reprogramming the ESP32 or rebooting it retains XBT connections and restores connections on boot!
+11) yielding support for prioritizing color control. If two objects are writing to the same channel and one has yielding enabled, it will not change the channel color state until the other yielded color set times out --> https://youtu.be/lSP--44Ucbo Demonstrates 2 objects yielding with 3 writing. 3 and 2 second timeout, once both timeout the color control is returned to the global color changer :)
