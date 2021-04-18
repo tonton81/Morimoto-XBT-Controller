@@ -13,18 +13,37 @@ XBT::XBT(uint32_t _node, FlexCAN_T4_Base* _busWritePtr) {
 }
 
 
-void XBT::write(const XBT_led_t &config) {
+void XBT::write(XBT_led_t &config) {
   CAN_message_t msg;
   msg.id = node;
   msg.flags.extended = 1;
   msg.len = 7;
   msg.buf[0] = config.ports >> 8;
   msg.buf[1] = config.ports;
+
+  for ( uint8_t i = 0; i < 5; i++ ) { /* check for any yields */
+    if ( config.yields[i] != nullptr ) {
+      if ( config.yields[i]->_current ) {
+        if ( ((millis() - config.yields[i]->_current) > config.yields[i]->_timeout) ) {
+          config.yields[i]->_current = 0;
+          continue;
+        }
+        if ( ((millis() - config.yields[i]->_current) < config.yields[i]->_timeout) ) {
+          uint16_t last_ports = (uint16_t)((msg.buf[0]) << 8) | msg.buf[1];
+          uint16_t ports = last_ports & ~(config.yields[i]->ports & 0xFFF);
+          msg.buf[0] = ports >> 8;
+          msg.buf[1] = ports;
+        }
+      }
+    }
+  }
+
   msg.buf[2] = config.red;
   msg.buf[3] = config.green;
   msg.buf[4] = config.blue;
   msg.buf[5] = config._mode;
   msg.buf[6] = config._speed;
+  config._current = millis();
   _busToWrite->write(msg);
 }
 
@@ -117,6 +136,27 @@ void ext_isotp_output1(const ISOTP_data &config, const uint8_t *buf) {
 
 
 
+bool XBT_led_t::busy() {
+  if ( ((millis() - _current) > _timeout) ) {
+    _current = 0;
+  }
+  return _current;
+}
 
-
-
+void XBT_led_t::yield(XBT_led_t& _yield) {
+  bool found = 0;
+  for ( uint8_t i = 0; i < 5; i++ ) { /* check if already added */
+    if ( yields[i] == &_yield ) {
+      found = 1;
+      break;
+    }
+  }
+  if ( !found ) {
+    for ( uint8_t i = 0; i < 5; i++ ) { /* add if not already added */
+      if ( yields[i] == nullptr ) {
+        yields[i] = &_yield;
+        break;
+      }
+    }
+  }
+}
