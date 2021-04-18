@@ -7,6 +7,7 @@
 #include <FlexCAN_T4.h>
 #include <isotp.h>
 
+
 XBT::XBT(uint32_t _node, FlexCAN_T4_Base* _busWritePtr) {
   node = _node;
   _busToWrite = _busWritePtr;
@@ -20,6 +21,9 @@ void XBT::write(XBT_led_t &config) {
   msg.len = 7;
   msg.buf[0] = config.ports >> 8;
   msg.buf[1] = config.ports;
+
+  int update = config.update();
+  if ( update == -1 ) return;
 
   for ( uint8_t i = 0; i < 5; i++ ) { /* check for any yields */
     if ( config.yields[i] != nullptr ) {
@@ -43,7 +47,16 @@ void XBT::write(XBT_led_t &config) {
   msg.buf[4] = config.blue;
   msg.buf[5] = config._mode;
   msg.buf[6] = config._speed;
-  config._current = millis();
+
+  uint16_t current_ports = (uint16_t)((msg.buf[0]) << 8) | msg.buf[1]; /* store local color history */
+  for ( uint8_t i = 0; i < 12; i++ ) {
+    if ( current_ports & (1U << i) ) {
+      XBT_leds_array[i].red = config.red;
+      XBT_leds_array[i].green = config.green;
+      XBT_leds_array[i].blue = config.blue;
+    }
+  }
+
   _busToWrite->write(msg);
 }
 
@@ -143,6 +156,7 @@ bool XBT_led_t::busy() {
   return _current;
 }
 
+
 void XBT_led_t::yield(XBT_led_t& _yield) {
   bool found = 0;
   for ( uint8_t i = 0; i < 5; i++ ) { /* check if already added */
@@ -159,4 +173,51 @@ void XBT_led_t::yield(XBT_led_t& _yield) {
       }
     }
   }
+}
+
+
+int XBT_led_t::update() {
+  _current = millis();
+  if ( fadeToColorEnabled ) {
+    CRGB current = CRGB(red, green, blue);
+    if ( current == _target ) return -1;
+    _fadeTowardColor(current, _target, _amount);
+    red = current.red;
+    green = current.green;
+    blue = current.blue;
+  }
+  return 0;
+}
+
+
+void XBT_led_t::fadeTowardColor(const CRGB& source, const CRGB& target, uint8_t amount) {
+  fadeToColorEnabled = 1;
+  _source = source;
+  red = source.red;
+  green = source.green;
+  blue = source.blue;
+  _target = target;
+  _amount = amount;
+}
+
+
+void XBT_led_t::_nblendU8TowardU8(uint8_t& cur, const uint8_t target, uint8_t amount) {
+  if ( cur == target) return;
+  if ( cur < target ) {
+    uint8_t delta = target - cur;
+    delta = scale8_video(delta, amount);
+    cur += delta;
+  }
+  else {
+    uint8_t delta = cur - target;
+    delta = scale8_video(delta, amount);
+    cur -= delta;
+  }
+}
+
+CRGB XBT_led_t::_fadeTowardColor(CRGB& cur, const CRGB& target, uint8_t amount) {
+  _nblendU8TowardU8(cur.red, target.red, amount);
+  _nblendU8TowardU8(cur.green, target.green, amount);
+  _nblendU8TowardU8(cur.blue, target.blue, amount);
+  return cur;
 }
