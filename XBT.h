@@ -11,13 +11,19 @@ typedef struct XBT_led_t {
   uint8_t blue = 0;
   void addPort(uint8_t port) { ports |= (1UL << port); }
   void solid() { _mode = 1; }
-  void fade() { _mode = 2; }
-  void strobe() { _mode = 3; }
+  void fade() { _mode = 2; } /* XBT hardware free-running mode */
+  void strobe() { _mode = 3; } /* XBT hardware free-running mode */
   void speed(uint8_t value) { _speed = value; }
   void yield(XBT_led_t& _yield);
   void timeout(uint32_t _time_ms) { _timeout = _time_ms; }
   bool busy();
-  void fadeTowardColor(const CRGB& source, const CRGB& target, uint8_t amount);
+  void fadeWithRGB(const CRGB& target, uint8_t amount);
+  void fadeWithRGB(const CRGB& source, const CRGB& target, uint8_t amount);
+  void fadeWithHSV(const CRGB& target, uint16_t amount);
+  void fadeWithHSV(const CRGB& source, const CRGB& target, uint16_t amount);
+  void setColor(const CRGB& target);
+  void setBrightness(uint8_t value);
+  bool finished() { return _finished; }
 
   private:
     friend class XBT; /* to access these private members */
@@ -28,16 +34,27 @@ typedef struct XBT_led_t {
     uint32_t _timeout = 0; /* timeout for yield */
     uint32_t _current = 0; /* millis() at time of write */
     void _nblendU8TowardU8(uint8_t& cur, const uint8_t target, uint8_t amount);
-    CRGB _fadeTowardColor(CRGB& cur, const CRGB& target, uint8_t amount);
+    CRGB _fadeWithRGB(CRGB& cur, const CRGB& target, uint8_t amount);
     int update();
 
-    CRGB _source;
-    CRGB _target;
-    uint8_t _amount;
+    CRGB _sourceRGB;
+    CRGB _targetRGB;
+    CRGB _currentRGB;
+
+    CHSV _sourceHSV;
+    CHSV _targetHSV;
+    CHSV _currentHSV;
+
+    uint16_t _current_amount;
+    uint16_t _amount;
+    bool _finished = 0;
 
     bool fadeToColorEnabled = 0;
+    bool useHSVfading = 0;
+    bool useRGBfading = 0;
 
 } XBT_led_t;
+
 
 class XBT {
   public:

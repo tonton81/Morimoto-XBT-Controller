@@ -23,22 +23,14 @@ void XBT::write(XBT_led_t &config) {
   msg.buf[1] = config.ports;
 
   int update = config.update();
-  if ( update == -1 ) return;
+  if ( update == -1 ) return; /* exit write if fastled color cycle already complete */
 
   for ( uint8_t i = 0; i < 5; i++ ) { /* check for any yields */
-    if ( config.yields[i] != nullptr ) {
-      if ( config.yields[i]->_current ) {
-        if ( ((millis() - config.yields[i]->_current) > config.yields[i]->_timeout) ) {
-          config.yields[i]->_current = 0;
-          continue;
-        }
-        if ( ((millis() - config.yields[i]->_current) < config.yields[i]->_timeout) ) {
-          uint16_t last_ports = (uint16_t)((msg.buf[0]) << 8) | msg.buf[1];
-          uint16_t ports = last_ports & ~(config.yields[i]->ports & 0xFFF);
-          msg.buf[0] = ports >> 8;
-          msg.buf[1] = ports;
-        }
-      }
+    if ( config.yields[i] != nullptr && config.yields[i]->busy() ) {
+      uint16_t last_ports = (uint16_t)((msg.buf[0]) << 8) | msg.buf[1];
+      uint16_t ports = last_ports & ~(config.yields[i]->ports & 0xFFF);
+      msg.buf[0] = ports >> 8;
+      msg.buf[1] = ports;
     }
   }
 
@@ -177,27 +169,82 @@ void XBT_led_t::yield(XBT_led_t& _yield) {
 
 
 int XBT_led_t::update() {
+
   _current = millis();
-  if ( fadeToColorEnabled ) {
-    CRGB current = CRGB(red, green, blue);
-    if ( current == _target ) return -1;
-    _fadeTowardColor(current, _target, _amount);
-    red = current.red;
-    green = current.green;
-    blue = current.blue;
+
+  if ( useHSVfading ) {
+    if ( _currentHSV.h == _targetHSV.h ) {
+      _finished = 1;
+      useHSVfading = 0;
+      return -1;
+    }
+    _currentHSV = blend(_sourceHSV, _targetHSV, _current_amount, SHORTEST_HUES);
+    _current_amount += _amount;
+    if ( _current_amount > 255 ) _current_amount = 255;
+    CRGB color = _currentHSV;
+    red = color.red;
+    green = color.green;
+    blue = color.blue;
   }
+
+  if ( useRGBfading ) {
+    if ( _currentRGB == _targetRGB ) {
+      _finished = 1;
+      useRGBfading = 0;
+      return -1;
+    }
+    _fadeWithRGB(_currentRGB, _targetRGB, _amount);
+    red = _currentRGB.red;
+    green = _currentRGB.green;
+    blue = _currentRGB.blue;
+  }
+
   return 0;
 }
 
+void XBT_led_t::setColor(const CRGB& target) {
+  _currentRGB = target;
+  red = target.red;
+  green = target.green;
+  blue = target.blue;
+}
 
-void XBT_led_t::fadeTowardColor(const CRGB& source, const CRGB& target, uint8_t amount) {
-  fadeToColorEnabled = 1;
-  _source = source;
+
+void XBT_led_t::setBrightness(uint8_t value) {
+  _targetHSV = rgb2hsv_approximate(CRGB(red, green, blue));
+  _targetHSV.v = value;
+  setColor(_targetHSV);
+}
+
+
+void XBT_led_t::fadeWithHSV(const CRGB& target, uint16_t amount) {
+  fadeWithHSV(CRGB(red, green, blue), target, amount);
+}
+void XBT_led_t::fadeWithHSV(const CRGB& source, const CRGB& target, uint16_t amount) {
+  useHSVfading = 1;
+  _finished = 0;
+  _sourceHSV = _currentHSV = rgb2hsv_approximate(source);
+  _targetHSV = rgb2hsv_approximate(target);
+  _amount = amount;
+  _current_amount = 0;
   red = source.red;
   green = source.green;
   blue = source.blue;
-  _target = target;
+}
+
+
+void XBT_led_t::fadeWithRGB(const CRGB& target, uint8_t amount) {
+  fadeWithRGB(_currentRGB, target, amount);
+}
+void XBT_led_t::fadeWithRGB(const CRGB& source, const CRGB& target, uint8_t amount) {
+  _finished = 0;
+  useRGBfading = 1;
+  _sourceRGB = _currentRGB = source;
+  _targetRGB = target;
   _amount = amount;
+  red = source.red;
+  green = source.green;
+  blue = source.blue;
 }
 
 
@@ -215,7 +262,7 @@ void XBT_led_t::_nblendU8TowardU8(uint8_t& cur, const uint8_t target, uint8_t am
   }
 }
 
-CRGB XBT_led_t::_fadeTowardColor(CRGB& cur, const CRGB& target, uint8_t amount) {
+CRGB XBT_led_t::_fadeWithRGB(CRGB& cur, const CRGB& target, uint8_t amount) {
   _nblendU8TowardU8(cur.red, target.red, amount);
   _nblendU8TowardU8(cur.green, target.green, amount);
   _nblendU8TowardU8(cur.blue, target.blue, amount);
