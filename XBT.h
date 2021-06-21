@@ -9,7 +9,7 @@ typedef struct XBT_led_t {
   bool yield_color_set = 0;
   uint8_t yielded_red = 0;
   uint8_t yielded_green = 0;
-  uint8_t yielded_blue = 100;
+  uint8_t yielded_blue = 0;
   void addPort(uint8_t port) { ports |= (1UL << port); }
   void solid() { _mode = 1; }
   void fade() { _mode = 2; } /* XBT hardware free-running mode */
