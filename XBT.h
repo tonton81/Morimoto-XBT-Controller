@@ -1,14 +1,15 @@
 #if !defined(_XBT_H_)
 #define _XBT_H_
-#include "Arduino.h"
 #include "circular_buffer.h"
-
-CRGB XBT_leds_array[12];
 
 typedef struct XBT_led_t {
   uint8_t red = 0;
   uint8_t green = 0;
   uint8_t blue = 0;
+  bool yield_color_set = 0;
+  uint8_t yielded_red = 0;
+  uint8_t yielded_green = 0;
+  uint8_t yielded_blue = 100;
   void addPort(uint8_t port) { ports |= (1UL << port); }
   void solid() { _mode = 1; }
   void fade() { _mode = 2; } /* XBT hardware free-running mode */
@@ -24,6 +25,7 @@ typedef struct XBT_led_t {
   void setColor(const CRGB& target);
   void setBrightness(uint8_t value);
   bool finished() { return _finished; }
+  void setReference(CRGB *ref) { reference = ref; }
 
   private:
     friend class XBT; /* to access these private members */
@@ -44,6 +46,8 @@ typedef struct XBT_led_t {
     CHSV _sourceHSV;
     CHSV _targetHSV;
     CHSV _currentHSV;
+
+    CRGB * reference = nullptr;
 
     uint16_t _current_amount;
     uint16_t _amount;
@@ -70,6 +74,7 @@ class XBT {
     friend struct XBT_led_t; /* to access these private members */
     uint32_t node = 0;
     FlexCAN_T4_Base* _busToWrite = nullptr;
+    CRGB XBT_leds_array[12];
 };
 
 #include "XBT.tpp"
