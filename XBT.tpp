@@ -1,9 +1,4 @@
 #include <XBT.h>
-#include "Arduino.h"
-#include <atomic>
-#include <util/atomic.h>
-#include "Stream.h"
-#include "circular_buffer.h"
 #include <FlexCAN_T4.h>
 #include <isotp.h>
 
@@ -15,6 +10,11 @@ XBT::XBT(uint32_t _node, FlexCAN_T4_Base* _busWritePtr) {
 
 
 void XBT::write(XBT_led_t &config) {
+  if ( config.reference ) {
+    config.reference->red = config.red;
+    config.reference->green = config.green;
+    config.reference->blue = config.blue;
+  }
   CAN_message_t msg;
   msg.id = node;
   msg.flags.extended = 1;
@@ -26,6 +26,12 @@ void XBT::write(XBT_led_t &config) {
   if ( update == -1 ) return; /* exit write if fastled color cycle already complete */
 
   for ( uint8_t i = 0; i < 5; i++ ) { /* check for any yields */
+    if ( config.yields[i] != nullptr ) {
+      config.yields[i]->yield_color_set = 1;
+      config.yields[i]->yielded_red = config.red;
+      config.yields[i]->yielded_green = config.green;
+      config.yields[i]->yielded_blue = config.blue;
+    }
     if ( config.yields[i] != nullptr && config.yields[i]->busy() ) {
       uint16_t last_ports = (uint16_t)((msg.buf[0]) << 8) | msg.buf[1];
       uint16_t ports = last_ports & ~(config.yields[i]->ports & 0xFFF);
@@ -89,7 +95,7 @@ void XBT::setMAC(uint8_t controller, const char* mac) {
   msg.id = node;
   msg.flags.extended = 1;
   msg.len = 7;
-  msg.buf[0] = 0x40 | (1UL << 1);
+  msg.buf[0] = 0x40 | (1UL << controller);
   int values[6] = { 0 };
   sscanf(mac, "%x:%x:%x:%x:%x:%x", &values[0], &values[1], &values[2], &values[3], &values[4], &values[5]);
   for ( int i = 0; i < 6; i++) msg.buf[i + 1] = values[i];
@@ -138,13 +144,8 @@ void ext_isotp_output1(const ISOTP_data &config, const uint8_t *buf) {
 }
 
 
-
-
-
 bool XBT_led_t::busy() {
-  if ( ((millis() - _current) > _timeout) ) {
-    _current = 0;
-  }
+  if ( ((millis() - _current) > _timeout) ) _current = 0;
   return _current;
 }
 
@@ -161,6 +162,13 @@ void XBT_led_t::yield(XBT_led_t& _yield) {
     for ( uint8_t i = 0; i < 5; i++ ) { /* add if not already added */
       if ( yields[i] == nullptr ) {
         yields[i] = &_yield;
+        yields[i]->yield_color_set = 1;
+        yields[i]->yielded_red = red;
+        yields[i]->yielded_green = green;
+        yields[i]->yielded_blue = blue;
+        yields[i]->red = red;
+        yields[i]->green = green;
+        yields[i]->blue = blue;
         break;
       }
     }
@@ -173,8 +181,8 @@ int XBT_led_t::update() {
   _current = millis();
 
   if ( useHSVfading ) {
-    if ( _currentHSV.h == _targetHSV.h ) {
-      _finished = 1;
+    if ( _currentHSV.h == _targetHSV.h && _currentHSV.s == _targetHSV.s && _currentHSV.v == _targetHSV.v ) {
+     _finished = 1;
       useHSVfading = 0;
       return -1;
     }
@@ -218,8 +226,24 @@ void XBT_led_t::setBrightness(uint8_t value) {
 
 
 void XBT_led_t::fadeWithHSV(const CRGB& target, uint16_t amount) {
-  fadeWithHSV(CRGB(red, green, blue), target, amount);
+  if ( reference ) {
+    useHSVfading = 1;
+    _finished = 0;
+    _sourceHSV = _currentHSV = rgb2hsv_approximate(*reference);
+    _targetHSV = rgb2hsv_approximate(target);
+    _amount = amount;
+    _current_amount = 0;
+    red = reference->red;
+    green = reference->green;
+    blue = reference->blue;
+  }
+  else if ( yield_color_set ) {
+    fadeWithHSV(CRGB(yielded_red, yielded_green, yielded_blue), target, amount);
+  }
+  else fadeWithHSV(CRGB(red, green, blue), target, amount);
 }
+
+
 void XBT_led_t::fadeWithHSV(const CRGB& source, const CRGB& target, uint16_t amount) {
   useHSVfading = 1;
   _finished = 0;
@@ -234,7 +258,20 @@ void XBT_led_t::fadeWithHSV(const CRGB& source, const CRGB& target, uint16_t amo
 
 
 void XBT_led_t::fadeWithRGB(const CRGB& target, uint8_t amount) {
-  fadeWithRGB(_currentRGB, target, amount);
+  if ( reference ) {
+    _finished = 0;
+    useRGBfading = 1;
+    _sourceRGB = _currentRGB = *reference;
+    _targetRGB = target;
+    _amount = amount;
+    red = reference->red;
+    green = reference->green;
+    blue = reference->blue;
+  }
+  else if ( yield_color_set ) {
+    fadeWithRGB(CRGB(yielded_red, yielded_green, yielded_blue), target, amount);
+  }
+  else fadeWithRGB(_currentRGB, target, amount);
 }
 void XBT_led_t::fadeWithRGB(const CRGB& source, const CRGB& target, uint8_t amount) {
   _finished = 0;
