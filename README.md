@@ -25,3 +25,6 @@ Bonus, compared to their phone app:
 10) MAC addresses of your XBT connections are stored on ESP32 SPIFFS, so reprogramming the ESP32 or rebooting it retains XBT connections and restores connections on boot!
 11) yielding support for prioritizing color control. If two objects are writing to the same channel and one has yielding enabled, it will not change the channel color state until the other yielded color set times out --> https://youtu.be/lSP--44Ucbo Demonstrates 2 objects yielding with 3 writing. 3 and 2 second timeout, once both timeout the color control is returned to the global color changer :)
 12) fade from one color to another, youtube demo of yielding one channel while fading from red to blue: https://youtu.be/L13zRHvfDLA
+13) Demo, multi channel same colors flashing, with 1 channel fading priority, and returning channel to multi channel color sync https://youtu.be/yt_gPmQVNBU
+14) Demo, Global color with priority *HSV* fading of a single channel, fading to random colors then back to global color, uses referencing https://youtu.be/yKwUmaZjm8s
+15) Demo, Global color with priority *RGB* fading of a single channel, fading to random colors then back to global color, uses referencing https://youtu.be/KP21ItBOH2g
