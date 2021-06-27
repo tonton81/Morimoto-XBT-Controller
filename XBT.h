@@ -33,7 +33,7 @@ typedef struct XBT_led_t {
     uint8_t _speed = 1;
     uint16_t ports = ( 1UL << 15 );
     XBT_led_t *yields[5] = { nullptr };
-    uint32_t _timeout = 0; /* timeout for yield */
+    uint32_t _timeout = 1000; /* timeout for yield, default 1 second */
     uint32_t _current = 0; /* millis() at time of write */
     void _nblendU8TowardU8(uint8_t& cur, const uint8_t target, uint8_t amount);
     CRGB _fadeWithRGB(CRGB& cur, const CRGB& target, uint8_t amount);
@@ -51,7 +51,7 @@ typedef struct XBT_led_t {
 
     uint16_t _current_amount;
     uint16_t _amount;
-    bool _finished = 0;
+    bool _finished = 1;
 
     bool fadeToColorEnabled = 0;
     bool useHSVfading = 0;
