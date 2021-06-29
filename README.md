@@ -28,3 +28,8 @@ Bonus, compared to their phone app:
 13) Demo, multi channel same colors flashing, with 1 channel fading priority, and returning channel to multi channel color sync https://youtu.be/yt_gPmQVNBU
 14) Demo, Global color with priority *HSV* fading of a single channel, fading to random colors then back to global color, uses referencing https://youtu.be/yKwUmaZjm8s
 15) Demo, Global color with priority *RGB* fading of a single channel, fading to random colors then back to global color, uses referencing https://youtu.be/KP21ItBOH2g
+16) XBT-APP multi controller sync issues:
+      When the app locks a fade or strobe to multiple XBT controllers, after awhile they will be out of sync from each other, because they are free-running on each controller.
+      So if you run multiple XBT bluetooth controllers, and you run fade or strobe, you'll have sync issues.
+      If we don't use the phone app and use this library to control fading, the colors will always be in sync, all the time.
+      Video of 2 XBT's set to color fade using app, out of sync after several hours: https://youtu.be/d8n5rjzM8QM
