@@ -113,11 +113,13 @@ void XBT::keepAlive() {
 
 
 void ext_isotp_output1(const ISOTP_data &config, const uint8_t *buf) {
-  if ( config.id == 0xFADE ) {
+  if ( (config.id >> abs(16 - __builtin_clzl(config.id))) == 0xFADE ) {
     if ( buf[0] == 0 ) { /* show programmed connections and their state */
-      Serial.print("\n***** XBT Connections *****\n");
+      if ( config.len == 26 ) Serial.print("\n***** XBT Connections *****\n");
+      else if ( buf[26] == 1 ) Serial.print("\n***** XKC Connections *****\n");
       for ( uint8_t i = 0; i < 4; i++ ) {
-        Serial.print("XBT ");
+        if ( config.len == 26 ) Serial.print("XBT ");
+        else if ( buf[26] == 1 ) Serial.print("XKC ");
         Serial.print(i);
         Serial.print(":\tAddress: ");
         for ( uint8_t a = 0; a < 6; a++ ) {
@@ -126,12 +128,14 @@ void ext_isotp_output1(const ISOTP_data &config, const uint8_t *buf) {
         }
         Serial.print("\tStatus: ");
         Serial.print(((buf[1] & (1UL << i)) ? "Connected" : "Disconnected"));
+        if ( config.len > 26 && buf[26] == 1 ) Serial.printf("\tZones: %d", (uint8_t)((buf[27] >> (i * 2)) & 3U));
         Serial.println();
         Serial.flush();
       }
     }
-    if ( buf[0] == 1 ) { /* show found devices not programmed from scan */
-      Serial.print("\nFound XBT controller at address: ");
+    else { /* show found devices not programmed from scan */
+      if ( buf[0] == 1 ) Serial.print("\nFound XBT controller at address: ");
+      else if ( buf[0] == 2 ) Serial.print("\nFound XKC controller at address: ");
       for ( int i = 0; i < 6; i++ ) {
         Serial.print(buf[3+i],HEX);
         if ( i < 5 ) Serial.print(":");
